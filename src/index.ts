@@ -6,6 +6,9 @@ import {
   getUsers,
   resetUsers,
 } from "./db/queries/users.ts";
+import { fetchFeed } from "./rss.ts";
+import { createFeed } from "./db/queries/feeds.ts";
+import type { Feed, User } from "./db/schema.ts";
 
 type CommandHandler = (cmdName: string, ...args: string[]) => Promise<void>;
 
@@ -17,6 +20,8 @@ async function main() {
   registerCommand(registry, "register", handlerRegister);
   registerCommand(registry, "reset", handlerReset);
   registerCommand(registry, "users", handlerGetUsers);
+  registerCommand(registry, "agg", handlerAgg);
+  registerCommand(registry, "addfeed", handlerAddFeed);
 
   if (argv.length < 3) {
     console.error("Expect at least 1 argument");
@@ -64,6 +69,34 @@ async function handlerRegister(cmdName: string, ...args: string[]) {
   }
 }
 
+async function handlerAddFeed(cmdName: string, ...args: string[]) {
+  if (args.length < 2) {
+    throw new Error(`usage: ${cmdName} <feed_name> <url>`);
+  }
+  const cfg = readConfig();
+  const user = await getUserByName(cfg.currentUserName);
+  if (!user) {
+    throw new Error(`User ${cfg.currentUserName} not found`);
+  }
+
+  const [feedName, url] = args;
+  const data = await fetchFeed(url);
+  if (!data) {
+    throw new Error(`Failed to create feed`);
+  }
+  const res = await createFeed(feedName, url, user.id);
+  printFeed(res, user);
+}
+
+function printFeed(feed: Feed, user: User) {
+  console.log(`* ID:            ${feed.id}`);
+  console.log(`* Created:       ${feed.createdAt}`);
+  console.log(`* Updated:       ${feed.updatedAt}`);
+  console.log(`* name:          ${feed.name}`);
+  console.log(`* URL:           ${feed.url}`);
+  console.log(`* User:          ${user.name}`);
+}
+
 async function handlerReset(cmdName: string, ...args: string[]) {
   try {
     await resetUsers();
@@ -88,6 +121,15 @@ async function handlerGetUsers(cmdName: string, ...args: string[]) {
     }
   } catch (e) {
     throw new Error("Can't get users");
+  }
+}
+
+async function handlerAgg(cmdName: string, ...args: string[]) {
+  try {
+    const data = await fetchFeed("https://www.wagslane.dev/index.xml");
+    console.log(data);
+  } catch (e) {
+    throw new Error("Can't get feed");
   }
 }
 
