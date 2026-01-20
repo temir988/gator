@@ -7,7 +7,7 @@ import {
   resetUsers,
 } from "./db/queries/users.ts";
 import { fetchFeed } from "./rss.ts";
-import { createFeed } from "./db/queries/feeds.ts";
+import { createFeed, getFeedsFull } from "./db/queries/feeds.ts";
 import type { Feed, User } from "./db/schema.ts";
 
 type CommandHandler = (cmdName: string, ...args: string[]) => Promise<void>;
@@ -22,6 +22,7 @@ async function main() {
   registerCommand(registry, "users", handlerGetUsers);
   registerCommand(registry, "agg", handlerAgg);
   registerCommand(registry, "addfeed", handlerAddFeed);
+  registerCommand(registry, "feeds", handlerFeeds);
 
   if (argv.length < 3) {
     console.error("Expect at least 1 argument");
@@ -88,13 +89,13 @@ async function handlerAddFeed(cmdName: string, ...args: string[]) {
   printFeed(res, user);
 }
 
-function printFeed(feed: Feed, user: User) {
+function printFeed(feed: Feed, user: User | null) {
   console.log(`* ID:            ${feed.id}`);
   console.log(`* Created:       ${feed.createdAt}`);
   console.log(`* Updated:       ${feed.updatedAt}`);
   console.log(`* name:          ${feed.name}`);
   console.log(`* URL:           ${feed.url}`);
-  console.log(`* User:          ${user.name}`);
+  console.log(`* User:          ${user?.name}`);
 }
 
 async function handlerReset(cmdName: string, ...args: string[]) {
@@ -121,6 +122,18 @@ async function handlerGetUsers(cmdName: string, ...args: string[]) {
     }
   } catch (e) {
     throw new Error("Can't get users");
+  }
+}
+
+async function handlerFeeds(cmdName: string, ...args: string[]) {
+  try {
+    const res = await getFeedsFull();
+    for (const { feeds, users } of res) {
+      printFeed(feeds, users);
+      console.log("=========");
+    }
+  } catch (e) {
+    throw new Error("Can't get feeds");
   }
 }
 
