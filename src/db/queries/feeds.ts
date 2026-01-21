@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../index.ts";
-import { feeds, users } from "../schema.ts";
+import { feedFollows, feeds, users } from "../schema.ts";
 
 export async function createFeed(name: string, url: string, userId: string) {
   const [result] = await db
@@ -15,5 +15,48 @@ export async function getFeedsFull() {
     .select()
     .from(feeds)
     .leftJoin(users, eq(feeds.userId, users.id));
+  return result;
+}
+
+export async function getFeedByUrl(url: string) {
+  const [result] = await db.select().from(feeds).where(eq(feeds.url, url));
+  return result;
+}
+
+export async function createFeedFollow(userId: string, feedId: string) {
+  const [newFeedFollow] = await db
+    .insert(feedFollows)
+    .values({ userId, feedId })
+    .returning();
+
+  const [result] = await db
+    .select({
+      id: feedFollows.id,
+      createdAt: feedFollows.createdAt,
+      updatedAT: feedFollows.updatedAt,
+      userId: feedFollows.userId,
+      feedId: feedFollows.feedId,
+      feedName: feeds.name,
+      userName: users.name,
+    })
+    .from(feedFollows)
+    .innerJoin(feeds, eq(feedFollows.feedId, feeds.id))
+    .innerJoin(users, eq(feedFollows.userId, users.id))
+    .where(
+      and(
+        eq(feedFollows.id, newFeedFollow.id),
+        eq(users.id, newFeedFollow.userId),
+      ),
+    );
+
+  return result;
+}
+
+export async function getFeedFollowsForUser(userId: string) {
+  const result = await db
+    .select()
+    .from(feeds)
+    .leftJoin(feedFollows, eq(feeds.id, feedFollows.feedId))
+    .where(eq(feedFollows.userId, userId));
   return result;
 }
