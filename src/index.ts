@@ -10,6 +10,7 @@ import { fetchFeed } from "./rss.ts";
 import {
   createFeed,
   createFeedFollow,
+  deleteFeedFollow,
   getFeedByUrl,
   getFeedFollowsForUser,
   getFeedsFull,
@@ -28,6 +29,7 @@ async function main() {
   registerCommand(registry, "feeds", handlerFeeds);
   registerCommand(registry, "addfeed", middlewareLoggedIn(handlerAddFeed));
   registerCommand(registry, "follow", middlewareLoggedIn(handlerFollow));
+  registerCommand(registry, "unfollow", middlewareLoggedIn(handlerUnFollow));
   registerCommand(
     registry,
     "following",
@@ -97,7 +99,21 @@ async function handlerFollow(cmdName: string, user: User, ...args: string[]) {
   console.log(`* Feed: ${follows.feedName}`);
 }
 
-// UserCommandHandler
+async function handlerUnFollow(cmdName: string, user: User, ...args: string[]) {
+  if (args.length < 1) {
+    throw new Error(`usage: ${cmdName} <url>`);
+  }
+  const url = args[0];
+  const feed = await getFeedByUrl(url);
+
+  if (!feed) {
+    throw new Error(`Feed not found: ${url}`);
+  }
+
+  await deleteFeedFollow(user.id, feed.id);
+  console.log(`Feed follow deleted:`);
+}
+
 async function handlerAddFeed(cmdName: string, user: User, ...args: string[]) {
   if (args.length < 2) {
     throw new Error(`usage: ${cmdName} <feed_name> <url>`);

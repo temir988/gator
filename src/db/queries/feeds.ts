@@ -23,6 +23,12 @@ export async function getFeedByUrl(url: string) {
   return result;
 }
 
+export async function deleteFeedFollow(userId: string, feedId: string) {
+  await db
+    .delete(feedFollows)
+    .where(and(eq(feedFollows.feedId, feedId), eq(feedFollows.userId, userId)));
+}
+
 export async function createFeedFollow(userId: string, feedId: string) {
   const [newFeedFollow] = await db
     .insert(feedFollows)

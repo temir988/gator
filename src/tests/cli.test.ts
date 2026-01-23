@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 
-describe("CLI", () => {
+describe("Basic CLI", () => {
   test("should reset db", async () => {
     const proc = Bun.spawn(["bun", "run", "src/index.ts", "reset"]);
     const exitCode = await proc.exited;
@@ -93,5 +93,68 @@ describe("CLI", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Hacker News RSS");
     expect(stdout).not.toContain("Lanes Blog");
+  });
+});
+
+describe("Unfollow flow", () => {
+  test("should reset db", async () => {
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "reset"]);
+    const exitCode = await proc.exited;
+    expect(exitCode).toBe(0);
+  });
+
+  test("should register a user", async () => {
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "register", "kahya"]);
+    const exitCode = await proc.exited;
+    expect(exitCode).toBe(0);
+  });
+
+  test("should addfeed Hacker News RSS", async () => {
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      "src/index.ts",
+      "addfeed",
+      "Hacker News RSS",
+      "https://hnrss.org/newest",
+    ]);
+    const exitCode = await proc.exited;
+    expect(exitCode).toBe(0);
+  });
+
+  test("should have Hacker News RSS", async () => {
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "following"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Hacker News RSS");
+  });
+
+  test("should unfollow Hacker News RSS", async () => {
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      "src/index.ts",
+      "unfollow",
+      "https://hnrss.org/newest",
+    ]);
+    const exitCode = await proc.exited;
+    expect(exitCode).toBe(0);
+  });
+
+  test("should not have Hacker News RSS", async () => {
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "following"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout).not.toContain("Hacker News RSS");
   });
 });
