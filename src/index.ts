@@ -15,10 +15,8 @@ import {
   getFeedsFull,
 } from "./db/queries/feeds.ts";
 import type { Feed, User } from "./db/schema.ts";
-
-type CommandHandler = (cmdName: string, ...args: string[]) => Promise<void>;
-
-type CommandsRegistry = Record<string, CommandHandler>;
+import type { CommandHandler, CommandsRegistry } from "./types.ts";
+import { middlewareLoggedIn } from "./middleware.ts";
 
 async function main() {
   const registry: CommandsRegistry = {};
@@ -27,10 +25,14 @@ async function main() {
   registerCommand(registry, "reset", handlerReset);
   registerCommand(registry, "users", handlerGetUsers);
   registerCommand(registry, "agg", handlerAgg);
-  registerCommand(registry, "addfeed", handlerAddFeed);
   registerCommand(registry, "feeds", handlerFeeds);
-  registerCommand(registry, "follow", handlerFollow);
-  registerCommand(registry, "following", handlerShowFollows);
+  registerCommand(registry, "addfeed", middlewareLoggedIn(handlerAddFeed));
+  registerCommand(registry, "follow", middlewareLoggedIn(handlerFollow));
+  registerCommand(
+    registry,
+    "following",
+    middlewareLoggedIn(handlerShowFollows),
+  );
 
   if (argv.length < 3) {
     console.error("Expect at least 1 argument");
@@ -78,36 +80,27 @@ async function handlerRegister(cmdName: string, ...args: string[]) {
   }
 }
 
-async function handlerFollow(cmdName: string, ...args: string[]) {
+async function handlerFollow(cmdName: string, user: User, ...args: string[]) {
   if (args.length < 1) {
     throw new Error(`usage: ${cmdName} <url>`);
   }
   const url = args[0];
-  const cfg = readConfig();
   const feed = await getFeedByUrl(url);
 
   if (!feed) {
     throw new Error(`Feed not found: ${url}`);
   }
 
-  const user = await getUserByName(cfg.currentUserName);
-  if (!user) {
-    throw new Error(`User ${cfg.currentUserName} not found`);
-  }
   const follows = await createFeedFollow(user.id, feed.id);
   console.log(`Feed follow created:`);
   console.log(`* User: ${follows.userName}`);
   console.log(`* Feed: ${follows.feedName}`);
 }
 
-async function handlerAddFeed(cmdName: string, ...args: string[]) {
+// UserCommandHandler
+async function handlerAddFeed(cmdName: string, user: User, ...args: string[]) {
   if (args.length < 2) {
     throw new Error(`usage: ${cmdName} <feed_name> <url>`);
-  }
-  const cfg = readConfig();
-  const user = await getUserByName(cfg.currentUserName);
-  if (!user) {
-    throw new Error(`User ${cfg.currentUserName} not found`);
   }
 
   const [feedName, url] = args;
@@ -169,13 +162,11 @@ async function handlerFeeds(cmdName: string, ...args: string[]) {
   }
 }
 
-async function handlerShowFollows(cmdName: string, ...args: string[]) {
-  const cfg = readConfig();
-  const user = await getUserByName(cfg.currentUserName);
-  if (!user) {
-    throw new Error(`User ${cfg.currentUserName} not found`);
-  }
-
+async function handlerShowFollows(
+  cmdName: string,
+  user: User,
+  ...args: string[]
+) {
   const follows = await getFeedFollowsForUser(user.id);
   console.log(`User ${user.name} is following: `);
   for (const { feeds } of follows) {
