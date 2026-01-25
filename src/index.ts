@@ -20,6 +20,7 @@ import {
 import type { Feed, User } from "./db/schema.ts";
 import type { CommandHandler, CommandsRegistry } from "./types.ts";
 import { middlewareLoggedIn } from "./middleware.ts";
+import { createPost, getPostsForUsers } from "./db/queries/posts.ts";
 
 async function main() {
   const registry: CommandsRegistry = {};
@@ -37,6 +38,7 @@ async function main() {
     "following",
     middlewareLoggedIn(handlerShowFollows),
   );
+  registerCommand(registry, "browse", middlewareLoggedIn(handlerBrowse));
 
   if (argv.length < 3) {
     console.error("Expect at least 1 argument");
@@ -244,7 +246,23 @@ async function scrapeFeeds() {
   //Iterate over the items
   console.log("Posts from: ", nextFeed.url);
   for (let item of feed.channel.item) {
-    console.log("Post title: ", item.title);
+    const post = await createPost(
+      nextFeed.id,
+      item.title,
+      item.link,
+      new Date(item.pubDate),
+      item.description,
+    );
+    console.log(post);
+  }
+}
+
+async function handlerBrowse(cmdName: string, user: User, ...args: string[]) {
+  const limit = parseInt(args[0]) || 2;
+  const posts = await getPostsForUsers(user.id, limit);
+  for (let post of posts) {
+    console.log(`* Title:            ${post.title}`);
+    console.log(`* description:      ${post.description}`);
   }
 }
 
