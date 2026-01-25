@@ -14,6 +14,8 @@ import {
   getFeedByUrl,
   getFeedFollowsForUser,
   getFeedsFull,
+  getNextFeedToFetch,
+  markFeedFetched,
 } from "./db/queries/feeds.ts";
 import type { Feed, User } from "./db/schema.ts";
 import type { CommandHandler, CommandsRegistry } from "./types.ts";
@@ -191,11 +193,58 @@ async function handlerShowFollows(
 }
 
 async function handlerAgg(cmdName: string, ...args: string[]) {
-  try {
-    const data = await fetchFeed("https://www.wagslane.dev/index.xml");
-    console.log(data);
-  } catch (e) {
-    throw new Error("Can't get feed");
+  if (args.length < 1) {
+    throw new Error(`usage: ${cmdName} <time_between_requests>`);
+  }
+  const [time] = args;
+  const timeBetweenRequests = parseDuration(time);
+  scrapeFeeds().catch((e) => console.log(e));
+
+  const interval = setInterval(() => {
+    scrapeFeeds().catch((e) => console.log(e));
+  }, timeBetweenRequests);
+
+  await new Promise<void>((resolve) => {
+    process.on("SIGINT", () => {
+      console.log("Shutting down feed aggregator...");
+      clearInterval(interval);
+      resolve();
+    });
+  });
+}
+
+function parseDuration(durationStr: string): number {
+  const regex = /^(\d+)(ms|s|m|h)$/;
+  const match = durationStr.match(regex);
+
+  if (!match) {
+    throw new Error(`Invalid duration: ${durationStr}`);
+  }
+
+  console.log(`Collecting feeds every ${durationStr}`);
+
+  const multipliers = {
+    ms: 1,
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+  } as const;
+
+  const value = parseInt(match[1]);
+  const unit = match[2] as keyof typeof multipliers;
+
+  return value * multipliers[unit];
+}
+
+async function scrapeFeeds() {
+  const nextFeed = (await getNextFeedToFetch()) as any as Feed;
+  console.log(nextFeed);
+  await markFeedFetched(nextFeed.id);
+  const feed = await fetchFeed(nextFeed.url);
+  //Iterate over the items
+  console.log("Posts from: ", nextFeed.url);
+  for (let item of feed.channel.item) {
+    console.log("Post title: ", item.title);
   }
 }
 
